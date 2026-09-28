@@ -49,24 +49,28 @@ src/shared/           plain .ts, no package.json — imported by relative path
 src/server/
   config.ts            env var loading — everything is optional (`|| null`),
                        none of it is `required()`; see "Config and secrets"
-  auth/                Yahoo OAuth2: authorize URL, token exchange/refresh,
-                       on-disk token persistence (data/yahoo-token.json)
+  auth/                basicAuth.ts (whole-app HTTP Basic Auth gate, the
+                       first hook registered) + Yahoo OAuth2 (authorize URL,
+                       token exchange/refresh, on-disk token persistence at
+                       data/yahoo-token.json)
   sources/yahoo/       Yahoo Fantasy Sports API client + the normalization
                        helpers that untangle its XML-shaped JSON, and one
                        file per resource (league, roster, players, draft) —
                        currently blocked, see above
   sources/openai/      thin wrapper around the Chat Completions endpoint
   features/            draftAssistant.ts + chat.ts (Yahoo-backed, currently
-                       blocked) and manualDraft.ts (hand-typed data, the
-                       working path) — all three build a prompt string,
-                       then call sources/openai
+                       blocked), manualDraft.ts (builds the GPT prompt for
+                       hand-typed data, the working path), and
+                       manualDraftStore.ts (its on-disk persistence at
+                       data/manual-draft.json)
   routes/               one file per route group, registered in index.ts
   cache/store.ts        disk-backed read-through cache with stale-on-error
   http/fetchJson.ts    GET/POST with retry+backoff and a per-host concurrency
                        cap; every outbound call (Yahoo, OpenAI) goes through this
 client/                self-contained Vite + React app, own package.json —
-                       hooks/useManualDraft.ts holds Manual Draft's state
-                       (localStorage only, no server persistence)
+                       hooks/useManualDraft.ts holds Manual Draft's local
+                       state, debounce-synced to the server (see "Manual
+                       Draft persistence" below)
 ```
 
 Not an npm-workspaces monorepo: Railway's repo scanner auto-splits
@@ -206,33 +210,81 @@ leaves the browser. Explicitly called out as riding on undocumented
 internals that Yahoo can change without notice; keep the OAuth path in the
 codebase rather than replacing it if this ever gets built.
 
+## Whole-app Basic Auth
+
+`auth/basicAuth.ts` registers an `onRequest` hook — the first thing
+registered in `index.ts`, before any route or the static-file handler — that
+gates every single request behind HTTP Basic Auth (`AUTH_USERNAME`/
+`AUTH_PASSWORD`). Ported from the same pattern used across other ipv6freely
+apps (e.g. sbb-bills' Next.js middleware): the browser caches the
+credentials per-origin after the first native prompt, so there's no
+session/cookie/login-page machinery to build. Plain string comparison, no
+`crypto.timingSafeEqual` — matches the source pattern exactly; this is a
+single-operator tool, not worth the extra complexity.
+
+Unlike every other config value in this app (Yahoo, OpenAI — see below),
+this one **fails closed**: if the env vars aren't set, every request gets a
+500, not a degraded-but-working app. An unauthenticated fantasy-draft app
+sitting on a public Railway URL is a real exposure; a missing Yahoo/OpenAI
+key just means a feature returns an error.
+
+In local dev, only `/api/*` is gated — Vite serves the page itself directly
+on :5173, and only proxies `/api/*` through to the Fastify process on :4322
+where the hook lives. In production, Fastify serves the static client too,
+so the whole thing (including the initial page load) is behind the prompt.
+Don't "fix" this dev/prod asymmetry by trying to gate Vite's dev server —
+it's expected and harmless (dev is a trusted local machine anyway).
+
+## Manual Draft persistence
+
+`features/manualDraftStore.ts` persists to `data/manual-draft.json` using
+the same atomic-write pattern as `auth/tokenStore.ts` (write to a temp file,
+`rename` over the real one — avoids a torn/partial file if the process dies
+mid-write). The client's `hooks/useManualDraft.ts` treats React state as the
+source of truth for rendering and debounces (500ms) writes to the server so
+typing in a text field doesn't fire a request per keystroke.
+
+Deliberately, `POST /api/manual/draft/suggest` and the manual-mode path of
+`POST /api/chat` do **not** read from this store — the client sends its
+current in-memory `config`/`picks` directly in the request body instead.
+This sidesteps a real race: if you click "Get recommendation" a moment
+after typing something, the debounced save might not have landed on disk
+yet, and reading from the store instead of the request body would mean the
+suggestion is grounded in stale data. The store exists purely for
+durability (surviving a redeploy, working from a second browser) — reads
+for correctness-sensitive requests always come from the caller.
+
 ## Config and secrets
 
-- Nothing in `config.ts` is `required()` — everything is `|| null`. This
-  used to not be true for the three `YAHOO_*` vars (they crashed the server
-  at boot if missing, copying the sleeper-advisor precedent this app started
-  from), but that broke the premise of Manual Draft mode: the server has to
-  boot and serve everything except the Yahoo-backed routes with zero Yahoo
-  config present. `auth/yahooOAuth.ts`'s `requireYahooConfig()` is the one
-  place that still enforces the three Yahoo vars together, and only at the
-  point something actually tries to use them (`buildAuthUrl`,
-  `requestToken`) — callers (routes) catch and return a 4xx/502, never let
-  it bubble to an unhandled crash.
-- `OPENAI_API_KEY` follows the same optional pattern: every non-GPT feature
-  keeps working without it, and the GPT routes (`draft/suggest`,
-  `manual/draft/suggest`, `chat`) return a clear 502 with a message instead
-  of crashing the process.
+- Nothing in `config.ts` is `required()` — everything is `|| null` — except
+  in spirit `AUTH_USERNAME`/`AUTH_PASSWORD`, which aren't enforced by
+  `config.ts` itself but by the fail-closed Basic Auth hook above, which
+  runs before anything else. This used to also be true of the three
+  `YAHOO_*` vars (they crashed the server at boot if missing, copying the
+  sleeper-advisor precedent this app started from), but that broke the
+  premise of Manual Draft mode: the server has to boot and serve everything
+  except the Yahoo-backed routes with zero Yahoo config present.
+  `auth/yahooOAuth.ts`'s `requireYahooConfig()` is the one place that still
+  enforces the three Yahoo vars together, and only at the point something
+  actually tries to use them (`buildAuthUrl`, `requestToken`) — callers
+  (routes) catch and return a 4xx/502, never let it bubble to an unhandled
+  crash.
+- `OPENAI_API_KEY` follows the same optional-with-graceful-degradation
+  pattern: every non-GPT feature keeps working without it, and the GPT
+  routes (`draft/suggest`, `manual/draft/suggest`, `chat`) return a clear
+  502 with a message instead of crashing the process.
 - `isYahooConfigured()` (config.ts) and `isConnected()` (auth/yahooOAuth.ts)
   are two different questions — configured means the three env vars are
   set; connected means a token exists on disk. The Connect tab checks both
   separately (`/api/status`'s `yahooConfigured`, `/api/auth/status`'s
   `connected`) so it can tell "you haven't set up the Yahoo app" apart from
   "you haven't clicked Connect yet."
-- `data/yahoo-token.json` and `data/cache/` are both gitignored and both
-  need to survive redeploys on Railway (see README's Volume step) — the
-  token because losing it means re-doing OAuth, the cache because losing it
-  just means one extra round of Yahoo calls (harmless, but no reason to
-  force it).
+- `data/yahoo-token.json`, `data/manual-draft.json`, and `data/cache/` are
+  all gitignored and all need to survive redeploys on Railway (see README's
+  Volume step) — the Yahoo token because losing it means re-doing OAuth,
+  the manual draft state because losing it means re-typing your whole
+  league setup and draft log, the cache because losing it just means one
+  extra round of Yahoo calls (harmless, but no reason to force it).
 
 ## Tests
 

@@ -230,19 +230,23 @@ function DraftLog({
 }
 
 export function ManualDraftPage() {
-  const { config, setConfig, picks, addPick, removeLastPick, resetPicks } = useManualDraft();
+  const { config, setConfig, picks, addPick, removeLastPick, resetPicks, loaded } = useManualDraft();
   const suggestMutation = useMutation({
     mutationFn: () => api.suggestManualPick(config, picks),
   });
   const myTeam = config.teams.find((t) => t.isOwnTeam);
+
+  if (!loaded) {
+    return <p className="state-message">Loading…</p>;
+  }
 
   return (
     <div className="manual-draft-page">
       <section className="panel">
         <p className="note">
           Log picks here as they happen in Yahoo's own draft room — this mode doesn't read or write anything on
-          Yahoo, it's a standalone assistant fed by what you type in. Everything here is saved in this browser only
-          (localStorage), not on the server.
+          Yahoo, it's a standalone assistant fed by what you type in. Everything here is saved on the server
+          (survives a redeploy and works from any browser), not just locally.
         </p>
       </section>
 

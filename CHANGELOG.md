@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Added whole-app HTTP Basic Auth** (`AUTH_USERNAME`/`AUTH_PASSWORD`),
+  same mechanism used across other ipv6freely apps: browser prompts once
+  and caches credentials per-origin, no session/cookie/login page. Fails
+  closed — every request gets a 500 until both vars are set. This is the
+  only config value in the app that behaves this way; everything else
+  (Yahoo, OpenAI) degrades gracefully instead.
+- **Manual Draft now persists server-side** to `data/manual-draft.json`
+  (the same Railway volume the Yahoo token already needs) instead of
+  browser localStorage — survives a redeploy and works from more than one
+  browser/device. New `GET`/`PUT /api/manual/draft/state` endpoints; the
+  client debounces writes (500ms) so typing doesn't fire a request per
+  keystroke. `suggest`/`chat` still take the client's in-memory state
+  directly rather than reading this store, to avoid grounding a
+  recommendation in a save that hasn't landed yet.
 - **Added Manual Draft mode** (`features/manualDraft.ts`,
   `routes/manualDraft.ts`, `client/src/pages/ManualDraft.tsx`,
   `client/src/hooks/useManualDraft.ts`): type in your league's teams,

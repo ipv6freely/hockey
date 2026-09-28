@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api.ts";
 import type { ManualLeagueConfig, ManualPick } from "../../../src/shared/index";
-
-const CONFIG_KEY = "manualDraft.config";
-const PICKS_KEY = "manualDraft.picks";
 
 const emptyConfig: ManualLeagueConfig = {
   leagueName: "",
@@ -12,27 +10,41 @@ const emptyConfig: ManualLeagueConfig = {
   teams: [],
 };
 
-function load<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-/** All state lives in localStorage — there's no server-side persistence for manual mode, see AGENTS.md. */
+/**
+ * Persisted server-side to data/manual-draft.json (the same Railway volume
+ * the Yahoo token/cache already need — see README), not localStorage: state
+ * needs to survive a redeploy and be readable from more than one browser.
+ * Local React state stays the source of truth for rendering; saves to the
+ * server are debounced so typing in a text field doesn't fire a request per
+ * keystroke. suggest/chat calls send the in-memory state directly rather
+ * than relying on this debounced copy having landed yet.
+ */
 export function useManualDraft() {
-  const [config, setConfig] = useState<ManualLeagueConfig>(() => load(CONFIG_KEY, emptyConfig));
-  const [picks, setPicks] = useState<ManualPick[]>(() => load(PICKS_KEY, []));
+  const [config, setConfig] = useState<ManualLeagueConfig>(emptyConfig);
+  const [picks, setPicks] = useState<ManualPick[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-  }, [config]);
+    api.getManualDraftState().then((state) => {
+      setConfig(state.config);
+      setPicks(state.picks);
+      setLoaded(true);
+    });
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(PICKS_KEY, JSON.stringify(picks));
-  }, [picks]);
+    if (!loaded) return; // don't overwrite the real saved state with the initial empty one while it's still loading
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      api.saveManualDraftState({ config, picks }).catch(() => {
+        // best-effort background sync — suggest/chat work from in-memory state either way
+      });
+    }, 500);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [config, picks, loaded]);
 
   const addPick = (pick: Omit<ManualPick, "pickNumber">) => {
     setPicks((prev) => [...prev, { ...pick, pickNumber: prev.length + 1 }]);
@@ -41,5 +53,5 @@ export function useManualDraft() {
   const removeLastPick = () => setPicks((prev) => prev.slice(0, -1));
   const resetPicks = () => setPicks([]);
 
-  return { config, setConfig, picks, addPick, removeLastPick, resetPicks };
+  return { config, setConfig, picks, addPick, removeLastPick, resetPicks, loaded };
 }

@@ -6,6 +6,7 @@ import type {
   DraftSuggestion,
   LeagueSettings,
   LeagueSummary,
+  ManualDraftState,
   ManualLeagueConfig,
   ManualPick,
   PlayerSummary,
@@ -23,6 +24,19 @@ async function getJson<T>(path: string): Promise<T> {
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${path} -> HTTP ${res.status} ${text}`);
+  }
+  return (await res.json()) as T;
+}
+
+async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -52,6 +66,8 @@ export const api = {
     postJson<DraftSuggestion>(`/api/league/${leagueKey}/draft/suggest`, { teamKey }),
   suggestManualPick: (config: ManualLeagueConfig, picks: ManualPick[]) =>
     postJson<DraftSuggestion>("/api/manual/draft/suggest", { config, picks }),
+  getManualDraftState: () => getJson<ManualDraftState>("/api/manual/draft/state"),
+  saveManualDraftState: (state: ManualDraftState) => putJson<{ ok: boolean }>("/api/manual/draft/state", state),
   chat: (leagueKey: string | null, question: string, history: ChatMessage[], manualContext?: string) =>
     postJson<ChatResponse>("/api/chat", { leagueKey, question, history, manualContext }),
 };

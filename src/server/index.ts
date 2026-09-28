@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { config } from "./config.ts";
+import { registerBasicAuth } from "./auth/basicAuth.ts";
 import { registerAuthRoutes } from "./routes/auth.ts";
 import { registerLeagueRoutes } from "./routes/league.ts";
 import { registerTeamRoutes } from "./routes/team.ts";
@@ -19,6 +20,7 @@ const clientDist = path.resolve(here, "../../client/dist");
 
 const app = Fastify({ logger: true });
 
+registerBasicAuth(app);
 registerAuthRoutes(app);
 registerLeagueRoutes(app);
 registerTeamRoutes(app);

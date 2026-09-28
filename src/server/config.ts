@@ -16,6 +16,13 @@ export const config = {
   // Optional: draft suggestions and chat return a clear error until this is set.
   openaiApiKey: process.env.OPENAI_API_KEY || null,
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  // Whole-app HTTP Basic Auth gate — same mechanism as the other ipv6freely
+  // apps (browser caches credentials per-origin after the first prompt, no
+  // session/cookie machinery). Unlike Yahoo/OpenAI above, this fails CLOSED
+  // when unset: an unauthenticated fantasy app on a public Railway URL is a
+  // real exposure, not a degraded feature.
+  authUsername: process.env.AUTH_USERNAME || null,
+  authPassword: process.env.AUTH_PASSWORD || null,
   port: Number(process.env.PORT ?? 4322),
   // here = <repoRoot>/src/server (dev, running .ts directly) or
   // <repoRoot>/dist/server (prod, running compiled .js) — same depth either way.
@@ -28,3 +35,4 @@ export function isYahooConfigured(): boolean {
 
 export const cacheDir = path.join(config.dataDir, "cache");
 export const tokenPath = path.join(config.dataDir, "yahoo-token.json");
+export const manualDraftPath = path.join(config.dataDir, "manual-draft.json");

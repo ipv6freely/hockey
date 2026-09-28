@@ -18,8 +18,9 @@ path until that's resolved.
   Yahoo's own draft room. One-click GPT recommendation for your next pick
   and a freeform chat box, both grounded in what you've typed in (there's no
   live player database behind this mode — the model uses its own knowledge
-  of NHL players). Everything is saved in your browser only (localStorage),
-  never sent to the server except per-request to build a prompt.
+  of NHL players). Saved server-side (`data/manual-draft.json`, on the same
+  volume as the Yahoo token — see Deploying below), so it survives a
+  redeploy and isn't tied to one browser.
 - **Yahoo Draft** — the Yahoo-API-backed version of the above: a live draft
   board (picks pulled straight from Yahoo as they happen), available
   players, and the same GPT recommendation/chat, grounded in real Yahoo
@@ -38,6 +39,11 @@ Yahoo's Fantasy Sports API is read-only from this app's side by choice: it
 tells you what to do, you click the buttons in the Yahoo app yourself. It
 never submits a pick, claim, or lineup change.
 
+The whole app sits behind HTTP Basic Auth (`AUTH_USERNAME`/`AUTH_PASSWORD`)
+— your browser prompts once and caches the credentials, no separate login
+page or session cookie involved. Same mechanism used across other
+ipv6freely apps.
+
 ## Project layout
 
 Not an npm-workspaces monorepo — Railway's repo scanner auto-splits those
@@ -46,9 +52,10 @@ into multiple services.
 ```
 src/shared/   plain .ts files (types only), no package.json,
               imported by relative path from both server and client
-src/server/   Fastify API — auth/ (Yahoo OAuth2), sources/yahoo/ (API client
-              + normalization), sources/openai/, features/ (draft assistant,
-              chat), routes/
+src/server/   Fastify API — auth/ (Basic Auth gate + Yahoo OAuth2),
+              sources/yahoo/ (API client + normalization), sources/openai/,
+              features/ (draft assistant, chat, manual draft + its storage),
+              routes/
 client/       self-contained Vite + React app with its OWN package.json —
               built independently via `cd client && npm run build`
 ```
@@ -58,11 +65,18 @@ so the deployed app is one process on one URL.
 
 ## Setup
 
-The Manual Draft tab needs none of this — only `OPENAI_API_KEY` (step 2) —
-so you can skip straight to step 2 if you're not chasing the Yahoo blocker
-above.
+Only `AUTH_USERNAME`/`AUTH_PASSWORD` (step 1) and `OPENAI_API_KEY` (step 2)
+matter for the currently-working Manual Draft path — skip straight to those
+if you're not chasing the Yahoo blocker above.
 
-### 1. Register a Yahoo app
+### 1. Pick a username and password
+
+Any values — these gate the whole app behind HTTP Basic Auth (see above),
+they're not tied to any external account. `AUTH_USERNAME`/`AUTH_PASSWORD`
+below. The server refuses every request with a 500 until both are set, so
+this isn't optional the way the Yahoo/OpenAI vars are.
+
+### 2. Register a Yahoo app
 
 Create an app at <https://developer.yahoo.com/apps/> with **Fantasy Sports**
 read permission. Set its redirect URI to match `YAHOO_REDIRECT_URI` below
@@ -71,22 +85,24 @@ exactly (Yahoo checks this byte-for-byte) — for local dev that's
 deployed URL with the same path (see Deploying, below — you'll need to
 deploy once to get that URL before this redirect URI can be finalized).
 
-### 2. Get an OpenAI API key
+### 3. Get an OpenAI API key
 
 Create a key at <https://platform.openai.com/api-keys>. This is what "using
 my ChatGPT account" means technically: the app calls the OpenAI API with
 your key, not the consumer chatgpt.com session.
 
-### 3. Configure and install
+### 4. Configure and install
 
 ```
 npm install
 cp .env.example .env   # then fill in real values
 ```
 
-The only truly required var is `PORT` (and even that defaults to 4322).
-Everything else is optional, each degrading to a clear error on the specific
-features that need it rather than crashing the server (see `.env.example`):
+`AUTH_USERNAME`/`AUTH_PASSWORD` are the only vars that must be set for the
+server to do anything at all (it fails closed with a 500 otherwise — see
+above). `PORT` defaults to 4322. Everything else is optional, each
+degrading to a clear error on the specific features that need it rather
+than blocking the whole app (see `.env.example`):
 
 - `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET`, `YAHOO_REDIRECT_URI` — needed for
   the Connect tab / Yahoo Draft tab. Not needed for Manual Draft. Given the
@@ -108,8 +124,12 @@ npm run dev          # Fastify API on :4322, raw TS via Node's native stripping
 npm run dev:client    # Vite dev server on :5173, proxies /api to :4322
 ```
 
-Open <http://localhost:5173>, then use the Connect tab to link your Yahoo
-account.
+Open <http://localhost:5173>. The first `/api/*` call will trigger your
+browser's native Basic Auth prompt — enter `AUTH_USERNAME`/`AUTH_PASSWORD`
+from your `.env`. (In dev, only `/api/*` is gated, since Vite serves the
+page itself on :5173 directly; in production Fastify serves everything, so
+the whole app — including the page load — is behind the prompt.) Then use
+the Connect tab to link your Yahoo account, or just use Manual Draft.
 
 ## Building / running for production
 
@@ -133,15 +153,19 @@ npm run test    # node's built-in test runner, src/server/**/*.test.ts
    service (it may still try, based on framework detection in `client/`),
    keep only one and set its **Root Directory** to the repo root — not
    `client` or any subfolder.
-2. Add `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET`, `YAHOO_REDIRECT_URI` (your
-   Railway URL + `/api/auth/yahoo/callback`), `OPENAI_API_KEY`, and
-   optionally `YAHOO_LEAGUE_KEY` / `OPENAI_MODEL` in the service's
-   **Variables** tab. Don't set `PORT` — Railway injects it.
-3. Add a **Volume** mounted at `/app/data`. Without one, the Yahoo OAuth
-   token (`data/yahoo-token.json`) and the disk cache under `data/cache/`
-   are ephemeral — you'd have to reconnect Yahoo on every redeploy.
-4. Update the Yahoo app's registered redirect URI to match step 2's value,
-   then deploy.
+2. Add `AUTH_USERNAME`, `AUTH_PASSWORD` (required — the app returns 500 for
+   everything without these), and optionally `YAHOO_CLIENT_ID`,
+   `YAHOO_CLIENT_SECRET`, `YAHOO_REDIRECT_URI` (your Railway URL +
+   `/api/auth/yahoo/callback`), `OPENAI_API_KEY`, `YAHOO_LEAGUE_KEY` /
+   `OPENAI_MODEL` in the service's **Variables** tab. Don't set `PORT` —
+   Railway injects it.
+3. Add a **Volume** mounted at `/app/data`. Without one, the Manual Draft
+   state (`data/manual-draft.json`), the Yahoo OAuth token
+   (`data/yahoo-token.json`), and the disk cache under `data/cache/` are
+   all ephemeral — you'd lose your draft log/roster and have to reconnect
+   Yahoo on every redeploy.
+4. If using Yahoo, update the Yahoo app's registered redirect URI to match
+   step 2's value. Deploy.
 
 ## Known limitations
 
@@ -174,10 +198,10 @@ npm run test    # node's built-in test runner, src/server/**/*.test.ts
   actual live pick order and that the draft is a standard snake. The picks
   list itself is authoritative (Yahoo updates it live as picks happen) — the
   clock indicator is just a hint for who's likely up next.
-- **No app-level login wall**: anyone with the deployed URL can view league
-  data and trigger GPT calls billed to your OpenAI key. Fine for a
-  single-user tool on a private Railway URL; don't share the link if that's
-  a concern.
+- **Basic Auth is one shared username/password for the whole app**, not
+  per-user accounts — fine for a single-operator tool, but don't reuse a
+  meaningful password here, and note that anyone you share those
+  credentials with can trigger GPT calls billed to your OpenAI key.
 - **Draft-turn suggestions cap available players at 60** (by average pick)
   to keep the GPT prompt a reasonable size — deep-bench/streaming
   candidates beyond that won't be considered, only the players visible on

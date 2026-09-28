@@ -153,3 +153,8 @@ export interface ManualPick {
   playerName: string;
   position: string;
 }
+
+export interface ManualDraftState {
+  config: ManualLeagueConfig;
+  picks: ManualPick[];
+}
