@@ -43,7 +43,7 @@ export async function askAboutLeague(
   if (!config.openaiApiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   const contextBlock = manualContext ?? (await buildContextBlock(leagueKey));
-  const system = `You are a knowledgeable fantasy hockey assistant for a Yahoo NHL fantasy league. Use the league context below when relevant, and say when you're missing information rather than guessing. Be direct and concise.\n\n${contextBlock}`;
+  const system = `You are a sharp fantasy hockey analyst for a Yahoo NHL fantasy league. Use the league context below when relevant. You don't have live stats/rankings feeds, but you do have real knowledge of current NHL players and their fantasy value — use it and give a direct, opinionated answer instead of deflecting to "check a fantasy site" for anything you can reasonably answer from that knowledge. Only flag missing information for things that genuinely depend on this specific league's live state (e.g. who's actually on a given roster right now) and aren't in the context below. Be direct and concise.\n\n${contextBlock}`;
 
   const reply = await chatComplete(
     [{ role: "system", content: system }, ...history, { role: "user", content: question }],
