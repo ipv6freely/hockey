@@ -4,6 +4,16 @@ import { readThrough } from "../../cache/store.ts";
 
 const BASE = "https://api-web.nhle.com/v1";
 
+// Cloudflare fronts this API and is known to weigh a missing User-Agent
+// (Node's fetch sends none by default) in its bot-management heuristics —
+// same defensive reasoning as the Yahoo client. Also a much shorter
+// timeout/retry budget than fetchJson's defaults: a healthy public sports
+// API should respond in well under a second, and with 32 sequential
+// per-team calls, fetchJson's normal 15s timeout x 3 retries would turn a
+// handful of genuinely unreachable teams into a multi-minute hang instead
+// of a fast, visible failure.
+const REQUEST_OPTS = { headers: { "User-Agent": "puck-advisor (+https://github.com/ipv6freely/hockey)" }, timeoutMs: 5_000, retries: 1 };
+
 /**
  * The NHL's own public stats API — unauthenticated, no API key, unrelated
  * to (and unblocked by) the Yahoo Fantasy Sports API gate in sources/yahoo/.
@@ -18,7 +28,7 @@ interface RawStandingsResponse {
 
 async function getActiveTeamTricodes(): Promise<string[]> {
   const { value } = await readThrough("nhl", "teams", 24 * 60 * 60_000, async () => {
-    const raw = await fetchJson<RawStandingsResponse>(`${BASE}/standings/now`);
+    const raw = await fetchJson<RawStandingsResponse>(`${BASE}/standings/now`, REQUEST_OPTS);
     return raw.standings.map((t) => t.teamAbbrev.default);
   });
   return value;
@@ -42,7 +52,7 @@ async function getTeamRoster(tricode: string): Promise<NhlPlayer[]> {
   // mid-week, and this endpoint is free/unauthenticated with no reason to
   // be stingy about refreshing it.
   const { value } = await readThrough("nhl", `roster-${tricode}`, 6 * 60 * 60_000, async () => {
-    const raw = await fetchJson<RawRosterResponse>(`${BASE}/roster/${tricode}/current`);
+    const raw = await fetchJson<RawRosterResponse>(`${BASE}/roster/${tricode}/current`, REQUEST_OPTS);
     const all = [...raw.forwards, ...raw.defensemen, ...raw.goalies];
     return all.map(
       (p): NhlPlayer => ({

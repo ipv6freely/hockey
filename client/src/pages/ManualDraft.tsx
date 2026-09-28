@@ -137,6 +137,17 @@ export function ManualDraftPage() {
         resetPicks={resetPicks}
         nhlPlayers={nhlPlayersQuery.data ?? []}
       />
+      {nhlPlayersQuery.isLoading && (
+        <p className="note">Loading NHL player list for autocomplete… (can take up to ~30s on a cold cache)</p>
+      )}
+      {nhlPlayersQuery.isError && (
+        <p className="state-message error">
+          Player autocomplete failed to load: {String(nhlPlayersQuery.error)} — you can still type names by hand.
+        </p>
+      )}
+      {nhlPlayersQuery.data && (
+        <p className="note">{nhlPlayersQuery.data.length} NHL players loaded for autocomplete.</p>
+      )}
 
       <section className="panel">
         <h3>GPT recommendation</h3>
