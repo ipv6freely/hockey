@@ -10,13 +10,14 @@ export function registerManualDraftRoutes(app: FastifyInstance) {
   // haven't been persisted yet (see client/src/hooks/useManualDraft.ts —
   // config edits require an explicit Save).
   app.post("/api/manual/draft/suggest", async (req, reply) => {
-    const { config: leagueConfig, picks } = req.body as {
+    const { config: leagueConfig, picks, model } = req.body as {
       config?: ManualLeagueConfig;
       picks?: ManualPick[];
+      model?: string;
     };
     if (!leagueConfig) return reply.code(400).send({ error: "config is required" });
     try {
-      return await suggestManualPick(leagueConfig, picks ?? []);
+      return await suggestManualPick(leagueConfig, picks ?? [], model);
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : "suggestion failed" });
     }

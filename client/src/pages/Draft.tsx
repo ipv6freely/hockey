@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../api.ts";
 import { useLeague } from "../context/LeagueContext.tsx";
-import { ChatBox, QueryBoundary } from "../components.tsx";
+import { ChatBox, ModelPicker, QueryBoundary, useModelPreference } from "../components.tsx";
 import type { PlayerSummary } from "../../../src/shared/index";
 
 function AvailablePlayers({ leagueKey }: { leagueKey: string }) {
@@ -57,8 +57,9 @@ export function DraftPage() {
     enabled: !!leagueKey,
     refetchInterval: 15_000,
   });
+  const [model, setModel] = useModelPreference();
   const suggestMutation = useMutation({
-    mutationFn: () => api.suggestPick(leagueKey!, ownTeamKey!),
+    mutationFn: () => api.suggestPick(leagueKey!, ownTeamKey!, model || undefined),
   });
 
   // Auto-fire exactly once per turn: keyed off currentPickNumber (which only
@@ -104,12 +105,18 @@ export function DraftPage() {
 
       <section className="panel">
         <h3>GPT recommendation</h3>
+        <ModelPicker value={model} onChange={setModel} />
         <button disabled={!ownTeamKey || suggestMutation.isPending} onClick={() => suggestMutation.mutate()}>
           {suggestMutation.isPending ? "Thinking…" : "Get recommendation for my next pick"}
         </button>
         <p className="note">Runs automatically once each time it becomes your turn — use the button to re-run it.</p>
         {!ownTeamKey && <p className="note">Your own team wasn't detected yet — check the League tab once teams load.</p>}
-        {suggestMutation.data && <p className="gpt-reply">{suggestMutation.data.reply}</p>}
+        {suggestMutation.data && (
+          <>
+            <p className="gpt-reply">{suggestMutation.data.reply}</p>
+            <p className="note">Model: {suggestMutation.data.model}</p>
+          </>
+        )}
         {suggestMutation.isError && <p className="state-message error">{String(suggestMutation.error)}</p>}
       </section>
 
@@ -139,7 +146,7 @@ export function DraftPage() {
 
       <section className="panel">
         <h3>Ask GPT</h3>
-        <ChatBox leagueKey={leagueKey} />
+        <ChatBox leagueKey={leagueKey} model={model} />
       </section>
     </div>
   );

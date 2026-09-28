@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../api.ts";
 import { useManualDraft } from "../hooks/useManualDraft.ts";
-import { ChatBox } from "../components.tsx";
-import type { ManualLeagueConfig, ManualPick } from "../../../src/shared/index";
+import { ChatBox, ModelPicker, PlayerAutocomplete, useModelPreference, useNhlPlayers } from "../components.tsx";
+import type { ManualLeagueConfig, ManualPick, NhlPlayer } from "../../../src/shared/index";
 
 function buildManualContext(config: ManualLeagueConfig, picks: ManualPick[]): string {
   const myTeam = config.teams.find((t) => t.isOwnTeam);
@@ -24,12 +24,14 @@ function DraftLog({
   addPick,
   removeLastPick,
   resetPicks,
+  nhlPlayers,
 }: {
   config: ManualLeagueConfig;
   picks: ManualPick[];
   addPick: (pick: Omit<ManualPick, "pickNumber">) => void;
   removeLastPick: () => void;
   resetPicks: () => void;
+  nhlPlayers: NhlPlayer[];
 }) {
   const [teamName, setTeamName] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -50,11 +52,14 @@ function DraftLog({
               </option>
             ))}
           </select>
-          <input
-            className="search-input"
-            placeholder="Player name"
+          <PlayerAutocomplete
+            players={nhlPlayers}
             value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
+            onChange={setPlayerName}
+            onSelect={(p) => {
+              setPlayerName(p.name);
+              setPosition(p.position);
+            }}
           />
           <input
             className="search-input small"
@@ -103,8 +108,10 @@ function DraftLog({
 
 export function ManualDraftPage() {
   const { config, picks, addPick, removeLastPick, resetPicks, loaded } = useManualDraft();
+  const [model, setModel] = useModelPreference();
+  const nhlPlayersQuery = useNhlPlayers();
   const suggestMutation = useMutation({
-    mutationFn: () => api.suggestManualPick(config, picks),
+    mutationFn: () => api.suggestManualPick(config, picks, model || undefined),
   });
   const myTeam = config.teams.find((t) => t.isOwnTeam);
 
@@ -122,21 +129,34 @@ export function ManualDraftPage() {
         </p>
       </section>
 
-      <DraftLog config={config} picks={picks} addPick={addPick} removeLastPick={removeLastPick} resetPicks={resetPicks} />
+      <DraftLog
+        config={config}
+        picks={picks}
+        addPick={addPick}
+        removeLastPick={removeLastPick}
+        resetPicks={resetPicks}
+        nhlPlayers={nhlPlayersQuery.data ?? []}
+      />
 
       <section className="panel">
         <h3>GPT recommendation</h3>
+        <ModelPicker value={model} onChange={setModel} />
         <button disabled={!myTeam || suggestMutation.isPending} onClick={() => suggestMutation.mutate()}>
           {suggestMutation.isPending ? "Thinking…" : "Get recommendation for my next pick"}
         </button>
         {!myTeam && <p className="note">Mark your own team on the Settings tab first.</p>}
-        {suggestMutation.data && <p className="gpt-reply">{suggestMutation.data.reply}</p>}
+        {suggestMutation.data && (
+          <>
+            <p className="gpt-reply">{suggestMutation.data.reply}</p>
+            <p className="note">Model: {suggestMutation.data.model}</p>
+          </>
+        )}
         {suggestMutation.isError && <p className="state-message error">{String(suggestMutation.error)}</p>}
       </section>
 
       <section className="panel">
         <h3>Ask GPT</h3>
-        <ChatBox leagueKey={null} manualContext={buildManualContext(config, picks)} />
+        <ChatBox leagueKey={null} manualContext={buildManualContext(config, picks)} model={model} />
       </section>
     </div>
   );

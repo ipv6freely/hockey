@@ -58,6 +58,9 @@ src/server/
                        file per resource (league, roster, players, draft) —
                        currently blocked, see above
   sources/openai/      thin wrapper around the Chat Completions endpoint
+  sources/nhl/         NHL's own public (unauthenticated) roster API — real
+                       player data, unrelated to the Yahoo block, powers the
+                       Manual Draft autocomplete only
   features/            draftAssistant.ts + chat.ts (Yahoo-backed, currently
                        blocked), manualDraft.ts (builds the GPT prompt for
                        hand-typed data, the working path), and
@@ -278,6 +281,55 @@ on screen even if you haven't clicked Save yet. The store exists purely for
 durability (surviving a redeploy, working from a second browser) — reads
 for correctness-sensitive requests always come from the caller, never the
 store.
+
+## NHL player data source (Manual Draft autocomplete)
+
+`sources/nhl/client.ts` hits `api-web.nhle.com`, the NHL's own public stats
+API — unauthenticated, no key, entirely separate from and unaffected by the
+Yahoo Fantasy Sports API block above. It's real NHL roster data (name,
+position, current team), not fantasy data, used only to power
+`PlayerAutocomplete` (`components.tsx`) in the Manual Draft draft log: type
+a few letters of a name, pick from the dropdown, and both the name and
+position fields fill in — selection is by the player's object/id, not by
+re-parsing a display string, so it's unambiguous even for the rare
+same-named players (e.g. there are two NHL players named Sebastian Aho, a
+forward and a defenseman).
+
+**Fetch this sequentially, never with `Promise.all` across all 32 teams** —
+confirmed by hitting it during development: the API Cloudflare-rate-limits
+(`429`, `Retry-After` header) a burst of ~32 concurrent requests, well under
+`fetchJson`'s existing per-host concurrency cap of 4. `getAllPlayers()`
+loops over teams one at a time instead. Each team's roster is cached 6h
+(`getTeamRoster`), the team list 24h (`getActiveTeamTricodes`) — a warm
+cache is ~32 cache hits (fast); a cold one is ~32 sequential network calls
+(slow, and still capable of tripping the rate limit if hammered repeatedly
+in a short window, which is a testing artifact, not a realistic one-draft-
+per-season usage pattern). Each team's fetch is wrapped in its own
+try/catch in `getAllPlayers()` so one team's failure doesn't blank the
+whole list — a partial player list degrades the autocomplete's coverage,
+never breaks it (typing a name by hand always still works).
+
+Route: `GET /api/nhl/players`, registered independent of Yahoo/OpenAI
+config — it works whether or not either of those is set up.
+
+## Model override plumbing
+
+Every GPT-calling route (`draft/suggest` on both Yahoo and manual paths,
+`chat`) accepts an optional `model` field in its request body, threaded
+through the corresponding `features/*.ts` function into `chatComplete`'s
+`opts.model`, which falls back to `config.openaiModel` when omitted
+(`sources/openai/client.ts`). Each `DraftSuggestion`/`ChatResponse` returns
+the model that was actually used, not just echoing back what was requested,
+specifically so the UI can show which model produced a given answer even
+when the field was left blank and the server default was used.
+
+Client-side, `ModelPicker` (`components.tsx`) is a free-text `<input>` with
+`<datalist>` suggestions, not a `<select>` — deliberately not a closed set,
+since any hardcoded model list will go stale as OpenAI ships new models.
+`useModelPreference` persists the choice to `localStorage` (a UI
+convenience, per-browser, unlike Manual Draft's league/pick data which is
+now server-persisted — this one genuinely doesn't need to be, and
+per-browser is the reasonable default for a personal preference like this).
 
 ## Config and secrets
 

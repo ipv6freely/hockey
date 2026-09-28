@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Added an OpenAI model picker** to every GPT-calling panel (Manual
+  Draft's recommendation/chat, Yahoo Draft's). Free-text with autocomplete
+  suggestions, not a locked dropdown — OpenAI ships new models often enough
+  that a hardcoded list would go stale — defaulting to the server's
+  configured model when left blank. Preference remembered per browser.
+  Suggestion/chat responses now report which model actually answered.
+- **Added a player autocomplete to the Manual Draft draft log**, fed by the
+  NHL's own public stats API (`api-web.nhle.com` — real roster data, no key
+  needed, entirely separate from and unaffected by the Yahoo block below).
+  Type a few letters of a name, pick from the dropdown, and position
+  auto-fills — typing a name by hand still works if someone's missing (a
+  very recent call-up, or a cold cache that hasn't finished warming up).
 - **Added whole-app HTTP Basic Auth** (`AUTH_USERNAME`/`AUTH_PASSWORD`),
   same mechanism used across other ipv6freely apps: browser prompts once
   and caches credentials per-origin, no session/cookie/login page. Fails

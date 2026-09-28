@@ -6,7 +6,7 @@ import { getDraftResults } from "../sources/yahoo/draft.ts";
 import { getPlayers } from "../sources/yahoo/players.ts";
 import { getRoster } from "../sources/yahoo/roster.ts";
 
-export async function suggestDraftPick(leagueKey: string, teamKey: string): Promise<DraftSuggestion> {
+export async function suggestDraftPick(leagueKey: string, teamKey: string, model?: string): Promise<DraftSuggestion> {
   if (!config.openaiApiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   const [settings, draft, teams] = await Promise.all([
@@ -53,10 +53,13 @@ export async function suggestDraftPick(leagueKey: string, teamKey: string): Prom
     `Who should I take with my next pick, and why?`,
   ].join("\n");
 
-  const reply = await chatComplete([
-    { role: "system", content: system },
-    { role: "user", content: user },
-  ]);
+  const reply = await chatComplete(
+    [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    { model },
+  );
 
-  return { reply, model: config.openaiModel, generatedAt: new Date().toISOString() };
+  return { reply, model: model ?? config.openaiModel, generatedAt: new Date().toISOString() };
 }

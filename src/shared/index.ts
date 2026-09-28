@@ -121,13 +121,20 @@ export interface ChatMessage {
 
 export interface ChatResponse {
   reply: string;
+  model: string;
   generatedAt: string;
 }
 
 // Manual-entry mode: for use while Yahoo API access is blocked (see
-// AGENTS.md). Entered and stored entirely client-side (localStorage) — the
-// server never persists any of this, it just receives it per-request to
-// build a GPT prompt.
+// AGENTS.md). Persisted server-side to data/manual-draft.json — see
+// features/manualDraftStore.ts — not tied to a specific league/team API.
+
+export interface NhlPlayer {
+  id: number;
+  name: string;
+  team: string;
+  position: string;
+}
 
 export interface ManualRosterSlot {
   position: string;

@@ -9,7 +9,11 @@ import { chatComplete } from "../sources/openai/client.ts";
  * prompt leans on the model's own knowledge of NHL players, guided by
  * which ones are already listed as drafted.
  */
-export async function suggestManualPick(leagueConfig: ManualLeagueConfig, picks: ManualPick[]): Promise<DraftSuggestion> {
+export async function suggestManualPick(
+  leagueConfig: ManualLeagueConfig,
+  picks: ManualPick[],
+  model?: string,
+): Promise<DraftSuggestion> {
   if (!config.openaiApiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   const myTeam = leagueConfig.teams.find((t) => t.isOwnTeam);
@@ -40,10 +44,13 @@ export async function suggestManualPick(leagueConfig: ManualLeagueConfig, picks:
     `Who should I take with my next pick, and why?`,
   ].join("\n");
 
-  const reply = await chatComplete([
-    { role: "system", content: system },
-    { role: "user", content: user },
-  ]);
+  const reply = await chatComplete(
+    [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    { model },
+  );
 
-  return { reply, model: config.openaiModel, generatedAt: new Date().toISOString() };
+  return { reply, model: model ?? config.openaiModel, generatedAt: new Date().toISOString() };
 }

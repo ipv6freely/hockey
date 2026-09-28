@@ -10,10 +10,10 @@ export function registerDraftRoutes(app: FastifyInstance) {
 
   app.post("/api/league/:leagueKey/draft/suggest", async (req, reply) => {
     const { leagueKey } = req.params as { leagueKey: string };
-    const { teamKey } = req.body as { teamKey?: string };
+    const { teamKey, model } = req.body as { teamKey?: string; model?: string };
     if (!teamKey) return reply.code(400).send({ error: "teamKey is required" });
     try {
-      return await suggestDraftPick(leagueKey, teamKey);
+      return await suggestDraftPick(leagueKey, teamKey, model);
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : "suggestion failed" });
     }

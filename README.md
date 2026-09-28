@@ -18,10 +18,14 @@ path until that's resolved.
   edits here aren't persisted until you click it.
 - **Manual Draft** — the currently-working draft-day path: log each pick as
   it happens in Yahoo's own draft room (saves immediately, no separate save
-  step), then get a one-click GPT recommendation for your next pick and a
-  freeform chat box, both grounded in your league setup and the picks so
-  far (there's no live player database behind this mode — the model uses
-  its own knowledge of NHL players). All of it saved server-side
+  step) — an autocomplete over the NHL's own public roster data fills in
+  position for you as you type a player's name, no Yahoo needed for that.
+  Then get a one-click GPT recommendation for your next pick and a freeform
+  chat box, both grounded in your league setup and the picks so far. Every
+  GPT call has a model field (autocomplete over a few common OpenAI models,
+  but any model ID can be typed directly) so you can compare answers across
+  models — remembered per browser, defaults to the server's configured
+  model if left blank. All draft data is saved server-side
   (`data/manual-draft.json`, on the same volume as the Yahoo token — see
   Deploying below), so it survives a redeploy and isn't tied to one
   browser.
@@ -210,3 +214,16 @@ npm run test    # node's built-in test runner, src/server/**/*.test.ts
   to keep the GPT prompt a reasonable size — deep-bench/streaming
   candidates beyond that won't be considered, only the players visible on
   the Draft tab's own list (which you can search).
+- **The Manual Draft player autocomplete can come back partial.** It's fed
+  by the NHL's own public API (not Yahoo, not gated by the RBAC block
+  above), fetched sequentially and cached 6h per team — but that API will
+  Cloudflare-rate-limit a burst of requests, which a cold cache can trigger.
+  Missing teams just mean fewer autocomplete matches until their cache
+  populates on a later request; typing a player by hand always works
+  regardless. A real single-draft-per-season usage pattern is very unlikely
+  to hit this.
+- **The model picker's suggestions are a starting point, not an
+  authoritative list** — OpenAI ships new models often enough that any
+  hardcoded list here will go stale. It's a free-text field with
+  autocomplete, not a locked dropdown, so any exact model ID can be typed
+  directly; check platform.openai.com/docs/models for what's current.

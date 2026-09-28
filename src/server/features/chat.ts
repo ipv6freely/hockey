@@ -38,17 +38,17 @@ export async function askAboutLeague(
   question: string,
   history: ChatMessage[],
   manualContext?: string,
+  model?: string,
 ): Promise<ChatResponse> {
   if (!config.openaiApiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   const contextBlock = manualContext ?? (await buildContextBlock(leagueKey));
   const system = `You are a knowledgeable fantasy hockey assistant for a Yahoo NHL fantasy league. Use the league context below when relevant, and say when you're missing information rather than guessing. Be direct and concise.\n\n${contextBlock}`;
 
-  const reply = await chatComplete([
-    { role: "system", content: system },
-    ...history,
-    { role: "user", content: question },
-  ]);
+  const reply = await chatComplete(
+    [{ role: "system", content: system }, ...history, { role: "user", content: question }],
+    { model },
+  );
 
-  return { reply, generatedAt: new Date().toISOString() };
+  return { reply, model: model ?? config.openaiModel, generatedAt: new Date().toISOString() };
 }
