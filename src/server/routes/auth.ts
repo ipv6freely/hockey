@@ -4,7 +4,11 @@ import { buildAuthUrl, disconnect, exchangeCode, isConnected, tokenExpiry, verif
 
 export function registerAuthRoutes(app: FastifyInstance) {
   app.get("/api/auth/yahoo/login", async (_req, reply) => {
-    reply.redirect(buildAuthUrl());
+    try {
+      reply.redirect(buildAuthUrl());
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "Yahoo isn't configured" });
+    }
   });
 
   app.get("/api/auth/yahoo/callback", async (req, reply) => {

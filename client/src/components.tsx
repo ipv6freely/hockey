@@ -11,12 +11,16 @@ export function QueryBoundary<T>({ query, children }: { query: UseQueryResult<T>
   return <>{children(query.data)}</>;
 }
 
-/** Freeform Q&A box grounded in the currently selected league — reused on the Draft tab and anywhere else ad hoc analysis is useful. */
-export function ChatBox({ leagueKey }: { leagueKey: string | null }) {
+/**
+ * Freeform Q&A box grounded in the currently selected league — reused on
+ * the Yahoo Draft tab and the Manual Draft tab. Pass `manualContext` to
+ * ground it in typed-in data instead of a Yahoo lookup.
+ */
+export function ChatBox({ leagueKey, manualContext }: { leagueKey: string | null; manualContext?: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const mutation = useMutation({
-    mutationFn: (question: string) => api.chat(leagueKey, question, messages),
+    mutationFn: (question: string) => api.chat(leagueKey, question, messages, manualContext),
     onSuccess: (res, question) => {
       setMessages((m) => [...m, { role: "user", content: question }, { role: "assistant", content: res.reply }]);
     },

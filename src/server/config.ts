@@ -3,16 +3,14 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-function required(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var ${name}`);
-  return v;
-}
-
 export const config = {
-  yahooClientId: required("YAHOO_CLIENT_ID"),
-  yahooClientSecret: required("YAHOO_CLIENT_SECRET"),
-  yahooRedirectUri: required("YAHOO_REDIRECT_URI"),
+  // Optional, unlike the sleeper-advisor precedent this app started from:
+  // the Manual Draft tab (see AGENTS.md on the Yahoo API blocker) needs none
+  // of this, so the server has to boot without it. Every Yahoo-backed route
+  // returns a clear error instead, same pattern as openaiApiKey below.
+  yahooClientId: process.env.YAHOO_CLIENT_ID || null,
+  yahooClientSecret: process.env.YAHOO_CLIENT_SECRET || null,
+  yahooRedirectUri: process.env.YAHOO_REDIRECT_URI || null,
   // Optional: skips league discovery and pins the app to one league.
   defaultLeagueKey: process.env.YAHOO_LEAGUE_KEY || null,
   // Optional: draft suggestions and chat return a clear error until this is set.
@@ -23,6 +21,10 @@ export const config = {
   // <repoRoot>/dist/server (prod, running compiled .js) — same depth either way.
   dataDir: path.resolve(here, "../../data"),
 } as const;
+
+export function isYahooConfigured(): boolean {
+  return !!(config.yahooClientId && config.yahooClientSecret && config.yahooRedirectUri);
+}
 
 export const cacheDir = path.join(config.dataDir, "cache");
 export const tokenPath = path.join(config.dataDir, "yahoo-token.json");

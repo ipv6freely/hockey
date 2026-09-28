@@ -9,6 +9,7 @@ export interface AuthStatus {
 
 export interface StatusResponse {
   yahooConnected: boolean;
+  yahooConfigured: boolean;
   openaiConfigured: boolean;
   defaultLeagueKey: string | null;
 }
@@ -121,4 +122,34 @@ export interface ChatMessage {
 export interface ChatResponse {
   reply: string;
   generatedAt: string;
+}
+
+// Manual-entry mode: for use while Yahoo API access is blocked (see
+// AGENTS.md). Entered and stored entirely client-side (localStorage) — the
+// server never persists any of this, it just receives it per-request to
+// build a GPT prompt.
+
+export interface ManualRosterSlot {
+  position: string;
+  count: number;
+}
+
+export interface ManualTeam {
+  name: string;
+  isOwnTeam: boolean;
+}
+
+export interface ManualLeagueConfig {
+  leagueName: string;
+  scoringNotes: string;
+  draftType: "snake" | "auction" | "other";
+  rosterSlots: ManualRosterSlot[];
+  teams: ManualTeam[];
+}
+
+export interface ManualPick {
+  pickNumber: number;
+  teamName: string;
+  playerName: string;
+  position: string;
 }

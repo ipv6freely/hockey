@@ -9,11 +9,22 @@ const TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token";
 // need to survive a server restart.
 let pendingState: string | null = null;
 
+function requireYahooConfig(): { clientId: string; clientSecret: string; redirectUri: string } {
+  const { yahooClientId: clientId, yahooClientSecret: clientSecret, yahooRedirectUri: redirectUri } = config;
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new Error(
+      "Yahoo isn't configured on this server — set YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET, and YAHOO_REDIRECT_URI",
+    );
+  }
+  return { clientId, clientSecret, redirectUri };
+}
+
 export function buildAuthUrl(): string {
+  const { clientId, redirectUri } = requireYahooConfig();
   pendingState = crypto.randomUUID();
   const params = new URLSearchParams({
-    client_id: config.yahooClientId,
-    redirect_uri: config.yahooRedirectUri,
+    client_id: clientId,
+    redirect_uri: redirectUri,
     response_type: "code",
     state: pendingState,
     language: "en-us",
@@ -32,16 +43,14 @@ export function verifyState(state: string | undefined): boolean {
   return !!state && !!pendingState && state === pendingState;
 }
 
-function basicAuthHeader(): string {
-  return "Basic " + Buffer.from(`${config.yahooClientId}:${config.yahooClientSecret}`).toString("base64");
-}
-
 async function requestToken(body: Record<string, string>): Promise<YahooToken> {
+  const { clientId, clientSecret } = requireYahooConfig();
+  const basicAuth = "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: basicAuthHeader(),
+      Authorization: basicAuth,
     },
     body: new URLSearchParams(body).toString(),
   });
@@ -63,11 +72,12 @@ async function requestToken(body: Record<string, string>): Promise<YahooToken> {
 }
 
 export async function exchangeCode(code: string): Promise<YahooToken> {
+  const { redirectUri } = requireYahooConfig();
   pendingState = null;
   return requestToken({
     grant_type: "authorization_code",
     code,
-    redirect_uri: config.yahooRedirectUri,
+    redirect_uri: redirectUri,
   });
 }
 

@@ -4,18 +4,33 @@ A dashboard for one Yahoo NHL fantasy hockey league: read-only against the
 league API, with a ChatGPT-backed analyst on top for the stuff no structured
 API can tell you — including live help during the draft itself.
 
+**Right now, Yahoo's Fantasy Sports API is rejecting every request from this
+app with `RBAC: access denied`, on a freshly created app, with the correct
+scope requested — see "Yahoo API access is currently blocked" under Known
+limitations before spending time on OAuth setup.** The **Manual Draft** tab
+works standalone without any Yahoo connection and is the primary supported
+path until that's resolved.
+
 ## What it does
 
-- **Draft** — the centerpiece, since this league hasn't drafted yet: a live
-  draft board (picks so far, pulled straight from Yahoo as they happen),
-  available players, a one-click GPT recommendation for your next pick
-  (grounded in your roster, the picks so far, and league scoring/roster
-  settings), and a freeform chat box for ad hoc questions mid-draft.
+- **Manual Draft** — the currently-working path: type in your league's
+  teams/roster slots/scoring once, then log each pick as it happens in
+  Yahoo's own draft room. One-click GPT recommendation for your next pick
+  and a freeform chat box, both grounded in what you've typed in (there's no
+  live player database behind this mode — the model uses its own knowledge
+  of NHL players). Everything is saved in your browser only (localStorage),
+  never sent to the server except per-request to build a prompt.
+- **Yahoo Draft** — the Yahoo-API-backed version of the above: a live draft
+  board (picks pulled straight from Yahoo as they happen), available
+  players, and the same GPT recommendation/chat, grounded in real Yahoo
+  data instead of typed-in data. Currently non-functional — see above.
 - **Team** — roster viewer for any team in the league, defaulting to yours.
+  (Yahoo-backed; same blocker.)
 - **Players** — general player search/rankings tool, useful post-draft for
-  waivers too.
+  waivers too. (Yahoo-backed; same blocker.)
 - **League** — settings (scoring type, roster slots, stat categories),
-  team list, and standings once the season starts.
+  team list, and standings once the season starts. (Yahoo-backed; same
+  blocker.)
 - **Connect** — Yahoo OAuth connect/disconnect, league picker, and a check
   that `OPENAI_API_KEY` is configured.
 
@@ -43,6 +58,10 @@ so the deployed app is one process on one URL.
 
 ## Setup
 
+The Manual Draft tab needs none of this — only `OPENAI_API_KEY` (step 2) —
+so you can skip straight to step 2 if you're not chasing the Yahoo blocker
+above.
+
 ### 1. Register a Yahoo app
 
 Create an app at <https://developer.yahoo.com/apps/> with **Fantasy Sports**
@@ -65,15 +84,13 @@ npm install
 cp .env.example .env   # then fill in real values
 ```
 
-Required env vars (see `.env.example`):
+The only truly required var is `PORT` (and even that defaults to 4322).
+Everything else is optional, each degrading to a clear error on the specific
+features that need it rather than crashing the server (see `.env.example`):
 
-- `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET` — from the Yahoo app above
-- `YAHOO_REDIRECT_URI` — must exactly match the app's registered redirect URI
-- `PORT` — defaults to 4322 locally; Railway injects its own and this is
-  ignored there
-
-Optional:
-
+- `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET`, `YAHOO_REDIRECT_URI` — needed for
+  the Connect tab / Yahoo Draft tab. Not needed for Manual Draft. Given the
+  current blocker above, you may not need these at all right now.
 - `YAHOO_LEAGUE_KEY` — pins the app to one league, skipping discovery. Find
   it in your league's Yahoo URL, or via the Connect tab's league picker once
   connected without it set.
@@ -128,6 +145,21 @@ npm run test    # node's built-in test runner, src/server/**/*.test.ts
 
 ## Known limitations
 
+- **Yahoo API access is currently blocked.** Every call to
+  `fantasysports.yahooapis.com` — even the most basic one,
+  `/users;use_login=1/games`, with no filters at all — returns
+  `403 RBAC: access denied`, with a valid, non-expired OAuth token. Ruled
+  out so far, none of which changed the result: recreating the Yahoo app
+  from scratch, adding `scope=fspt-r` to the authorize request, adding a
+  `User-Agent` header, disconnecting/reconnecting. This is not specific to
+  NHL, to the `/leagues` sub-resource, or to this app's OAuth config — it's
+  a categorical denial on the account/app combination itself, which points
+  to Yahoo's app-review/production-access gate rather than anything fixable
+  from this codebase. The **Manual Draft** tab exists specifically to route
+  around this for the current season; see AGENTS.md for the full
+  investigation and a documented (but not yet built) workaround using
+  Yahoo's undocumented `pub-api-ro.fantasysports.yahoo.com` frontend host,
+  if Yahoo access remains blocked and is worth revisiting later.
 - **Yahoo's JSON normalization is unverified against a live league.** This
   app was built before this league's draft, so `src/server/sources/yahoo/*.ts`
   was written from Yahoo's docs (which are inconsistent about response

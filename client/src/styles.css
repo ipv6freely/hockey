@@ -134,3 +134,18 @@ select {
 .chat-message.chat-assistant { border-left: 3px solid var(--accent); }
 .chat-form { display: flex; gap: 8px; }
 .chat-form .search-input { flex: 1; margin-right: 0; }
+
+.form-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.search-input.small { min-width: 70px; width: 70px; }
+.search-input.textarea {
+  display: block;
+  width: 100%;
+  min-height: 60px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+.editable-list { list-style: none; padding: 0; margin: 0 0 10px; font-size: 14px; }
+.editable-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.editable-list button { background: transparent; color: var(--bad); padding: 0 6px; font-size: 14px; }
+h4 { font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin: 14px 0 8px; }

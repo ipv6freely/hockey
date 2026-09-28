@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { LeagueProvider } from "./context/LeagueContext.tsx";
 import { api } from "./api.ts";
 import { ConnectPage } from "./pages/Connect.tsx";
+import { ManualDraftPage } from "./pages/ManualDraft.tsx";
 import { DraftPage } from "./pages/Draft.tsx";
 import { LeaguePage } from "./pages/League.tsx";
 import { TeamPage } from "./pages/Team.tsx";
@@ -10,11 +11,14 @@ import { PlayersPage } from "./pages/Players.tsx";
 
 const queryClient = new QueryClient();
 
-const TABS = ["Draft", "Team", "Players", "League", "Connect"] as const;
+// "Manual Draft" is the primary, working path for now — see AGENTS.md on
+// the Yahoo API access blocker. "Yahoo Draft" and the Yahoo-fed tabs stay
+// in place, dormant, for whenever that's resolved.
+const TABS = ["Manual Draft", "Yahoo Draft", "Team", "Players", "League", "Connect"] as const;
 type Tab = (typeof TABS)[number];
 
 function Shell() {
-  const [tab, setTab] = useState<Tab>("Draft");
+  const [tab, setTab] = useState<Tab>("Manual Draft");
   const authQuery = useQuery({ queryKey: ["authStatus"], queryFn: api.authStatus, refetchInterval: 60_000 });
 
   return (
@@ -33,7 +37,8 @@ function Shell() {
         )}
       </header>
       <main className="app-main">
-        {tab === "Draft" && <DraftPage />}
+        {tab === "Manual Draft" && <ManualDraftPage />}
+        {tab === "Yahoo Draft" && <DraftPage />}
         {tab === "Team" && <TeamPage />}
         {tab === "Players" && <PlayersPage />}
         {tab === "League" && <LeaguePage />}

@@ -6,6 +6,8 @@ import type {
   DraftSuggestion,
   LeagueSettings,
   LeagueSummary,
+  ManualLeagueConfig,
+  ManualPick,
   PlayerSummary,
   StandingsEntry,
   StatusResponse,
@@ -48,6 +50,8 @@ export const api = {
   draft: (leagueKey: string) => getJson<DraftState>(`/api/league/${leagueKey}/draft`),
   suggestPick: (leagueKey: string, teamKey: string) =>
     postJson<DraftSuggestion>(`/api/league/${leagueKey}/draft/suggest`, { teamKey }),
-  chat: (leagueKey: string | null, question: string, history: ChatMessage[]) =>
-    postJson<ChatResponse>("/api/chat", { leagueKey, question, history }),
+  suggestManualPick: (config: ManualLeagueConfig, picks: ManualPick[]) =>
+    postJson<DraftSuggestion>("/api/manual/draft/suggest", { config, picks }),
+  chat: (leagueKey: string | null, question: string, history: ChatMessage[], manualContext?: string) =>
+    postJson<ChatResponse>("/api/chat", { leagueKey, question, history, manualContext }),
 };

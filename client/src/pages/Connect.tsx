@@ -17,6 +17,11 @@ export function ConnectPage() {
     <div className="connect-page">
       <section className="panel">
         <h3>Yahoo account</h3>
+        <p className="note">
+          Yahoo's Fantasy Sports API is currently rejecting every request from this app with a categorical
+          "RBAC: access denied" — this isn't a config problem here, see README's Known limitations. Use the
+          Manual Draft tab instead for now.
+        </p>
         <QueryBoundary query={authQuery}>
           {(auth) =>
             auth.connected ? (
@@ -28,9 +33,20 @@ export function ConnectPage() {
                 <button onClick={() => logout.mutate()}>Disconnect</button>
               </div>
             ) : (
-              <a className="connect-button" href="/api/auth/yahoo/login">
-                Connect Yahoo Account
-              </a>
+              <QueryBoundary query={statusQuery}>
+                {(status) =>
+                  status.yahooConfigured ? (
+                    <a className="connect-button" href="/api/auth/yahoo/login">
+                      Connect Yahoo Account
+                    </a>
+                  ) : (
+                    <p className="note">
+                      Set YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET, and YAHOO_REDIRECT_URI in the server environment to
+                      enable this.
+                    </p>
+                  )
+                }
+              </QueryBoundary>
             )
           }
         </QueryBoundary>
