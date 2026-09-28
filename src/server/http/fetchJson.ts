@@ -72,11 +72,13 @@ export async function fetchJson<T>(url: string, opts: FetchJsonOptions = {}): Pr
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const res = await fetch(url, { headers: opts.headers, signal: controller.signal });
-        if (res.status === 429 || res.status >= 500) {
-          throw new FetchError(`${url} -> HTTP ${res.status}`, res.status);
-        }
         if (!res.ok) {
-          throw new FetchError(`${url} -> HTTP ${res.status}`, res.status);
+          // Include the response body: for Yahoo specifically, a bare status
+          // code has repeatedly not been enough to tell an OAuth/scope error
+          // apart from a WAF-level block on the request itself — the body
+          // usually says which.
+          const text = await res.text().catch(() => "");
+          throw new FetchError(`${url} -> HTTP ${res.status}${text ? `: ${text.slice(0, 500)}` : ""}`, res.status);
         }
         return (await res.json()) as T;
       } catch (err) {
