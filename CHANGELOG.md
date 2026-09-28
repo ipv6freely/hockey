@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Added draft order to Settings, and wired it into an actual "on the
+  clock" feature** rather than a purely informational field: reorder teams
+  with ↑/↓ (the team list's order *is* the draft order — no separate
+  field), and Manual Draft's log now shows who's on the clock, auto-
+  advances the team dropdown after each pick, and feeds current
+  round/pick/upcoming-pick-numbers into both the GPT recommendation and
+  chat context. New shared, unit-tested `computeManualDraftClock` (snake
+  math) in `src/shared/manualDraftClock.ts`, used identically by client
+  and server. `npm run test` now also runs `src/shared/**/*.test.ts`.
 - **Added an OpenAI model picker** to every GPT-calling panel (Manual
   Draft's recommendation/chat, Yahoo Draft's). Free-text with autocomplete
   suggestions, not a locked dropdown — OpenAI ships new models often enough

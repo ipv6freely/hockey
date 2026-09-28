@@ -14,21 +14,28 @@ path until that's resolved.
 ## What it does
 
 - **Settings** — set up your league once: name, scoring notes, roster
-  slots, and teams (mark which one is yours). Has its own Save button —
-  edits here aren't persisted until you click it.
-- **Manual Draft** — the currently-working draft-day path: log each pick as
-  it happens in Yahoo's own draft room (saves immediately, no separate save
-  step) — an autocomplete over the NHL's own public roster data fills in
-  position for you as you type a player's name, no Yahoo needed for that.
-  Then get a one-click GPT recommendation for your next pick and a freeform
-  chat box, both grounded in your league setup and the picks so far. Every
-  GPT call has a model field (autocomplete over a few common OpenAI models,
-  but any model ID can be typed directly) so you can compare answers across
-  models — remembered per browser, defaults to the server's configured
-  model if left blank. All draft data is saved server-side
-  (`data/manual-draft.json`, on the same volume as the Yahoo token — see
-  Deploying below), so it survives a redeploy and isn't tied to one
-  browser.
+  slots, and teams (mark which one is yours). The team list's order *is*
+  the draft order — reorder with the ↑/↓ buttons once your league sets the
+  real pick order. Has its own Save button — edits here aren't persisted
+  until you click it.
+- **Manual Draft** — the currently-working draft-day path: for snake
+  drafts, a banner shows who's on the clock right now (derived purely from
+  the draft order above and how many picks are logged, snake math built
+  in) and the team dropdown auto-advances to whoever's up next after each
+  pick. Log each pick as it happens in Yahoo's own draft room (saves
+  immediately, no separate save step) — an autocomplete over the NHL's own
+  public roster data fills in position for you as you type a player's
+  name, no Yahoo needed for that. Then get a one-click GPT recommendation
+  for your next pick and a freeform chat box, both grounded in your league
+  setup, draft order/current turn, and the picks so far — the
+  recommendation also factors in your next few upcoming pick numbers for
+  next-couple-rounds strategy. Every GPT call has a model field
+  (autocomplete over a few common OpenAI models, but any model ID can be
+  typed directly) so you can compare answers across models — remembered
+  per browser, defaults to the server's configured model if left blank.
+  All draft data is saved server-side (`data/manual-draft.json`, on the
+  same volume as the Yahoo token — see Deploying below), so it survives a
+  redeploy and isn't tied to one browser.
 - **Yahoo Draft** — the Yahoo-API-backed version of the above: a live draft
   board (picks pulled straight from Yahoo as they happen), available
   players, and the same GPT recommendation/chat, grounded in real Yahoo

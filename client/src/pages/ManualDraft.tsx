@@ -1,21 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../api.ts";
 import { useManualDraft } from "../hooks/useManualDraft.ts";
 import { ChatBox, ModelPicker, PlayerAutocomplete, useModelPreference, useNhlPlayers } from "../components.tsx";
+import { computeManualDraftClock } from "../../../src/shared/manualDraftClock";
 import type { ManualLeagueConfig, ManualPick, NhlPlayer } from "../../../src/shared/index";
 
 function buildManualContext(config: ManualLeagueConfig, picks: ManualPick[]): string {
   const myTeam = config.teams.find((t) => t.isOwnTeam);
+  const clock = config.draftType === "snake" ? computeManualDraftClock(config, picks.length) : null;
   return [
     `League "${config.leagueName || "unnamed"}", ${config.teams.length} teams, draft type: ${config.draftType}.`,
     `Scoring: ${config.scoringNotes || "not specified"}.`,
     `Roster slots: ${config.rosterSlots.map((r) => `${r.position}x${r.count}`).join(", ") || "not specified"}.`,
+    config.teams.length > 0 ? `Draft order (round 1): ${config.teams.map((t) => t.name).join(", ")}.` : "",
     myTeam ? `My team: ${myTeam.name}.` : "No team marked as mine yet.",
+    clock && !clock.isComplete
+      ? `Currently round ${clock.round}, pick ${clock.pickNumber} — ${clock.onTheClockTeamName} on the clock.`
+      : "",
     picks.length > 0
       ? `Picks so far: ${picks.map((p) => `#${p.pickNumber} ${p.teamName} - ${p.playerName} (${p.position})`).join("; ")}.`
       : "No picks recorded yet.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function DraftLog({
@@ -37,9 +45,31 @@ function DraftLog({
   const [playerName, setPlayerName] = useState("");
   const [position, setPosition] = useState("");
 
+  const clock = config.draftType === "snake" ? computeManualDraftClock(config, picks.length) : null;
+
+  // Auto-advance the team dropdown to whoever's on the clock after each
+  // pick, so logging a fast-moving live draft doesn't mean re-selecting
+  // the same dropdown every single time.
+  useEffect(() => {
+    if (clock && !clock.isComplete) setTeamName(clock.onTheClockTeamName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clock?.onTheClockTeamName, clock?.isComplete]);
+
   return (
     <section className="panel">
       <h3>Draft log</h3>
+      {clock && (
+        <p className="clock-banner">
+          {clock.isComplete ? (
+            "Draft complete!"
+          ) : (
+            <>
+              Round {clock.round}, pick {clock.pickNumber} — <strong>{clock.onTheClockTeamName}</strong> on the
+              clock.
+            </>
+          )}
+        </p>
+      )}
       {config.teams.length === 0 ? (
         <p className="note">Add teams on the Settings tab before logging picks.</p>
       ) : (

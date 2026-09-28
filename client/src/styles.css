@@ -174,3 +174,10 @@ h4 { font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-
 .player-autocomplete-list li { padding: 6px 10px; font-size: 14px; cursor: pointer; }
 .player-autocomplete-list li:hover { background: #1b2a36; }
 .player-autocomplete-list .note { margin: 0; display: inline; }
+
+.draft-order-num { color: var(--text-dim); font-size: 12px; min-width: 18px; display: inline-block; }
+.editable-list button.move-btn { color: var(--text-dim); }
+.editable-list button.move-btn:disabled { opacity: 0.3; }
+
+.clock-banner { background: #0e1c26; border-left: 3px solid var(--accent); padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; }
+.clock-banner strong { color: var(--accent); }

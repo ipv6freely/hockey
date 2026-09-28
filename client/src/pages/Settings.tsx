@@ -79,30 +79,52 @@ function LeagueSetup({ config, setConfig }: { config: ManualLeagueConfig; setCon
         </button>
       </div>
 
-      <h4>Teams</h4>
+      <h4>Teams &amp; draft order</h4>
       <ul className="editable-list">
-        {config.teams.map((team, i) => (
-          <li key={i}>
-            <label>
-              <input
-                type="radio"
-                name="ownTeam"
-                checked={team.isOwnTeam}
-                onChange={() =>
-                  setConfig({ ...config, teams: config.teams.map((t, j) => ({ ...t, isOwnTeam: j === i })) })
-                }
-              />{" "}
-              {team.name}
-              {team.isOwnTeam ? " (you)" : ""}
-            </label>{" "}
-            <button
-              type="button"
-              onClick={() => setConfig({ ...config, teams: config.teams.filter((_, j) => j !== i) })}
-            >
-              ×
-            </button>
-          </li>
-        ))}
+        {config.teams.map((team, i) => {
+          const moveTeam = (direction: -1 | 1) => {
+            const j = i + direction;
+            if (j < 0 || j >= config.teams.length) return;
+            const teams = [...config.teams];
+            [teams[i], teams[j]] = [teams[j], teams[i]];
+            setConfig({ ...config, teams });
+          };
+          return (
+            <li key={i}>
+              <span className="draft-order-num">{i + 1}.</span>
+              <button type="button" className="move-btn" onClick={() => moveTeam(-1)} disabled={i === 0} title="Move up">
+                ↑
+              </button>
+              <button
+                type="button"
+                className="move-btn"
+                onClick={() => moveTeam(1)}
+                disabled={i === config.teams.length - 1}
+                title="Move down"
+              >
+                ↓
+              </button>
+              <label>
+                <input
+                  type="radio"
+                  name="ownTeam"
+                  checked={team.isOwnTeam}
+                  onChange={() =>
+                    setConfig({ ...config, teams: config.teams.map((t, j) => ({ ...t, isOwnTeam: j === i })) })
+                  }
+                />{" "}
+                {team.name}
+                {team.isOwnTeam ? " (you)" : ""}
+              </label>{" "}
+              <button
+                type="button"
+                onClick={() => setConfig({ ...config, teams: config.teams.filter((_, j) => j !== i) })}
+              >
+                ×
+              </button>
+            </li>
+          );
+        })}
       </ul>
       <div className="form-row">
         <input
@@ -125,7 +147,10 @@ function LeagueSetup({ config, setConfig }: { config: ManualLeagueConfig; setCon
           Add team
         </button>
       </div>
-      <p className="note">Mark the radio button next to your own team so the assistant knows which roster is yours.</p>
+      <p className="note">
+        The list order above is the draft order (round 1 goes top to bottom) — use ↑/↓ once your league sets the
+        real pick order. Mark the radio button next to your own team so the assistant knows which roster is yours.
+      </p>
     </section>
   );
 }

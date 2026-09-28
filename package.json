@@ -12,7 +12,7 @@
     "build": "tsc -p tsconfig.json && cd client && npm install && npm run build",
     "start": "node --env-file-if-exists=.env dist/server/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit && cd client && npm install && npm run typecheck",
-    "test": "node --experimental-strip-types --test \"src/server/**/*.test.ts\""
+    "test": "node --experimental-strip-types --test \"src/server/**/*.test.ts\" \"src/shared/**/*.test.ts\""
   },
   "dependencies": {
     "@fastify/static": "^10.1.3",

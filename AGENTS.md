@@ -45,7 +45,10 @@ either path plugs back into.
 ```
 src/shared/           plain .ts, no package.json — imported by relative path
                        from both server and client (not an npm workspace;
-                       see below for why)
+                       see below for why); manualDraftClock.ts is the one
+                       piece of actual logic here (not just types) — snake-
+                       draft "whose turn is it" math, used by both sides,
+                       see "Manual Draft persistence" below
 src/server/
   config.ts            env var loading — everything is optional (`|| null`),
                        none of it is `required()`; see "Config and secrets"
@@ -282,6 +285,39 @@ durability (surviving a redeploy, working from a second browser) — reads
 for correctness-sensitive requests always come from the caller, never the
 store.
 
+**There's no separate "draft order" field.** `config.teams`' array order
+*is* the draft order (round 1 goes top to bottom) — deliberately, to avoid
+a second list that could drift out of sync with the teams list itself.
+Settings' ↑/↓ buttons (`Settings.tsx`) reorder that array directly. This
+means removing/re-adding a team does change draft order as a side effect —
+acceptable for a lightweight manual tool, not something to "fix" by adding
+a parallel ordering field.
+
+`shared/manualDraftClock.ts`'s `computeManualDraftClock(config, picksLogged)`
+is the pure snake-math function this order feeds into — given team order,
+roster-slot counts (which determine total picks: `teams.length *
+sum(rosterSlots.count)`), and how many picks have been logged, it returns
+whose turn it is, the round/pick number, and whether the draft is complete.
+Only meaningful for `draftType === "snake"`; callers check that themselves
+before using it (auction/other have no well-defined turn order). It's
+covered by `manualDraftClock.test.ts` — the highest-value tests in this
+app besides `normalize.test.ts`, since it's pure logic with real branching
+(round parity reversal, boundary/completion conditions) that's easy to get
+subtly wrong.
+
+Three independent call sites reuse this same function rather than each
+re-deriving the math: `ManualDraft.tsx`'s `DraftLog` (the on-the-clock
+banner, and a `useEffect` that auto-advances the team-select dropdown to
+whoever's up next after each pick — deliberately keyed off
+`clock?.onTheClockTeamName`/`clock?.isComplete`, not the whole `clock`
+object, so it doesn't refire on irrelevant re-renders), `buildManualContext`
+(feeds the chat endpoint), and `features/manualDraft.ts`'s
+`suggestManualPick` (feeds the GPT recommendation prompt, plus a small loop
+re-calling `computeManualDraftClock` for each future `picksLogged` value to
+find the user's own next few pick numbers — reuses the tested function
+rather than a separate derivation, at the cost of being O(remaining picks)
+instead of a closed-form calculation, which is irrelevant at this scale).
+
 ## NHL player data source (Manual Draft autocomplete)
 
 `sources/nhl/client.ts` hits `api-web.nhle.com`, the NHL's own public stats
@@ -365,13 +401,16 @@ per-browser is the reasonable default for a personal preference like this).
 
 ## Tests
 
-`npm run test` runs Node's built-in test runner over
-`src/server/**/*.test.ts`. Currently just `sources/yahoo/normalize.test.ts` —
-that module is pure (no network, no fs) and is the highest-risk piece of
-logic in the app (see above), so it's the one with the most to gain from
-being pinned down by tests. Feature modules that build GPT prompt strings
+`npm run test` runs Node's built-in test runner over both
+`src/server/**/*.test.ts` and `src/shared/**/*.test.ts` (the glob is in
+`package.json`, not hardcoded in the test runner itself — extend that if a
+third location ever needs tests). Two files today:
+`sources/yahoo/normalize.test.ts` and `shared/manualDraftClock.test.ts` —
+both pure (no network, no fs) and both cover logic that's easy to get
+subtly wrong (Yahoo's inconsistent JSON nesting; snake-draft round-parity
+math), which is the actual bar for what earns a test here, not file
+location. Feature modules that build GPT prompt strings
 (`features/draftAssistant.ts`, `features/chat.ts`, `features/manualDraft.ts`)
-are deliberately not
-unit-tested beyond that — their correctness is "does the prompt read well
-and get a useful answer," which is a manual/product judgment call more than
-a unit-testable one.
+are deliberately not unit-tested beyond that — their correctness is "does
+the prompt read well and get a useful answer," which is a manual/product
+judgment call more than a unit-testable one.
