@@ -17,6 +17,13 @@ export function buildAuthUrl(): string {
     response_type: "code",
     state: pendingState,
     language: "en-us",
+    // Checking "Fantasy Sports" on the app only makes this scope available
+    // to request — Yahoo's OAuth2 platform is shared across many APIs, so
+    // the authorization request still has to explicitly ask for it. Without
+    // this, the token comes back valid (auth succeeds) but carries no role
+    // for Fantasy Sports data, which is what surfaces later as Yahoo's
+    // opaque "RBAC: access denied" on the actual API calls.
+    scope: "fspt-r",
   });
   return `${AUTH_URL}?${params.toString()}`;
 }

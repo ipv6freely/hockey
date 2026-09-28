@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Fix:** the Yahoo authorization request never requested the Fantasy
+  Sports scope (`scope=fspt-r`). Checking "Fantasy Sports" on the Yahoo app
+  only makes that scope available to request — it doesn't get granted
+  automatically. Without it, OAuth completed successfully but every actual
+  Fantasy Sports API call failed with Yahoo's opaque `RBAC: access denied`.
+  Anyone who connected before this fix needs to disconnect and reconnect —
+  a refresh token issued without the scope stays scopeless forever.
 - All Yahoo API requests now send a `User-Agent` header — Node's default
   `fetch` sends none, and Yahoo's API is known to be stricter about that
   than about the header's actual value.
