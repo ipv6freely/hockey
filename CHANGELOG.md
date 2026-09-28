@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- All Yahoo API requests now send a `User-Agent` header — Node's default
+  `fetch` sends none, and Yahoo's API is known to be stricter about that
+  than about the header's actual value.
 - Draft tab now auto-fires the GPT recommendation once each time the
   best-effort "on the clock" indicator shows your team, keyed off
   `currentPickNumber` so it can't refire on a polling tick that still shows

@@ -18,7 +18,16 @@ export async function yahooGet<T = unknown>(
   }
   const url = `${BASE}${resourcePath}?${query.toString()}`;
 
-  const doFetch = (token: string) => fetchJson<T>(url, { headers: { Authorization: `Bearer ${token}` } });
+  // Yahoo's API is known to be stricter about requests with no User-Agent at
+  // all (Node's fetch sends none by default) than about the header's actual
+  // value — this is a defensive addition, not a spoofed browser identity.
+  const doFetch = (token: string) =>
+    fetchJson<T>(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "puck-advisor (+https://github.com/ipv6freely/hockey)",
+      },
+    });
 
   const token = await getAccessToken();
   try {
