@@ -6,8 +6,9 @@ import { loadManualDraftState, saveManualDraftState } from "../features/manualDr
 export function registerManualDraftRoutes(app: FastifyInstance) {
   // Suggest/chat take config+picks directly in the request body rather than
   // reading the persisted state below, so a recommendation always reflects
-  // whatever's currently in the browser even if the debounced save to disk
-  // hasn't landed yet.
+  // whatever's currently in the browser even if unsaved league-setup edits
+  // haven't been persisted yet (see client/src/hooks/useManualDraft.ts —
+  // config edits require an explicit Save).
   app.post("/api/manual/draft/suggest", async (req, reply) => {
     const { config: leagueConfig, picks } = req.body as {
       config?: ManualLeagueConfig;

@@ -4,6 +4,7 @@ import { LeagueProvider } from "./context/LeagueContext.tsx";
 import { api } from "./api.ts";
 import { ConnectPage } from "./pages/Connect.tsx";
 import { ManualDraftPage } from "./pages/ManualDraft.tsx";
+import { SettingsPage } from "./pages/Settings.tsx";
 import { DraftPage } from "./pages/Draft.tsx";
 import { LeaguePage } from "./pages/League.tsx";
 import { TeamPage } from "./pages/Team.tsx";
@@ -14,7 +15,7 @@ const queryClient = new QueryClient();
 // "Manual Draft" is the primary, working path for now — see AGENTS.md on
 // the Yahoo API access blocker. "Yahoo Draft" and the Yahoo-fed tabs stay
 // in place, dormant, for whenever that's resolved.
-const TABS = ["Manual Draft", "Yahoo Draft", "Team", "Players", "League", "Connect"] as const;
+const TABS = ["Manual Draft", "Settings", "Yahoo Draft", "Team", "Players", "League", "Connect"] as const;
 type Tab = (typeof TABS)[number];
 
 function Shell() {
@@ -38,6 +39,7 @@ function Shell() {
       </header>
       <main className="app-main">
         {tab === "Manual Draft" && <ManualDraftPage />}
+        {tab === "Settings" && <SettingsPage />}
         {tab === "Yahoo Draft" && <DraftPage />}
         {tab === "Team" && <TeamPage />}
         {tab === "Players" && <PlayersPage />}

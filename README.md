@@ -13,14 +13,18 @@ path until that's resolved.
 
 ## What it does
 
-- **Manual Draft** — the currently-working path: type in your league's
-  teams/roster slots/scoring once, then log each pick as it happens in
-  Yahoo's own draft room. One-click GPT recommendation for your next pick
-  and a freeform chat box, both grounded in what you've typed in (there's no
-  live player database behind this mode — the model uses its own knowledge
-  of NHL players). Saved server-side (`data/manual-draft.json`, on the same
-  volume as the Yahoo token — see Deploying below), so it survives a
-  redeploy and isn't tied to one browser.
+- **Settings** — set up your league once: name, scoring notes, roster
+  slots, and teams (mark which one is yours). Has its own Save button —
+  edits here aren't persisted until you click it.
+- **Manual Draft** — the currently-working draft-day path: log each pick as
+  it happens in Yahoo's own draft room (saves immediately, no separate save
+  step), then get a one-click GPT recommendation for your next pick and a
+  freeform chat box, both grounded in your league setup and the picks so
+  far (there's no live player database behind this mode — the model uses
+  its own knowledge of NHL players). All of it saved server-side
+  (`data/manual-draft.json`, on the same volume as the Yahoo token — see
+  Deploying below), so it survives a redeploy and isn't tied to one
+  browser.
 - **Yahoo Draft** — the Yahoo-API-backed version of the above: a live draft
   board (picks pulled straight from Yahoo as they happen), available
   players, and the same GPT recommendation/chat, grounded in real Yahoo

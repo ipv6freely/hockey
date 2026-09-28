@@ -8,14 +8,21 @@
   closed — every request gets a 500 until both vars are set. This is the
   only config value in the app that behaves this way; everything else
   (Yahoo, OpenAI) degrades gracefully instead.
+- **Split Manual Draft into two tabs**: league setup/teams moved to a new
+  **Settings** tab, leaving Manual Draft with just the draft log, GPT
+  recommendation, and chat.
 - **Manual Draft now persists server-side** to `data/manual-draft.json`
   (the same Railway volume the Yahoo token already needs) instead of
   browser localStorage — survives a redeploy and works from more than one
-  browser/device. New `GET`/`PUT /api/manual/draft/state` endpoints; the
-  client debounces writes (500ms) so typing doesn't fire a request per
-  keystroke. `suggest`/`chat` still take the client's in-memory state
-  directly rather than reading this store, to avoid grounding a
-  recommendation in a save that hasn't landed yet.
+  browser/device. New `GET`/`PUT /api/manual/draft/state` endpoints.
+  League config changes require an explicit **Save** button on the
+  Settings tab (no silent autosave — it was unclear whether an edit had
+  landed, especially once Settings became a separate tab from the draft
+  log); logging/undoing/resetting a pick still saves immediately, since
+  those are already discrete button clicks, not typing. `suggest`/`chat`
+  still take the client's in-memory state directly rather than reading
+  this store, so an unsaved Settings edit still grounds a live
+  recommendation correctly.
 - **Added Manual Draft mode** (`features/manualDraft.ts`,
   `routes/manualDraft.ts`, `client/src/pages/ManualDraft.tsx`,
   `client/src/hooks/useManualDraft.ts`): type in your league's teams,

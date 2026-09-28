@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api.ts";
 import type { ManualLeagueConfig, ManualPick } from "../../../src/shared/index";
 
@@ -10,20 +10,25 @@ const emptyConfig: ManualLeagueConfig = {
   teams: [],
 };
 
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
+
 /**
  * Persisted server-side to data/manual-draft.json (the same Railway volume
  * the Yahoo token/cache already need — see README), not localStorage: state
  * needs to survive a redeploy and be readable from more than one browser.
- * Local React state stays the source of truth for rendering; saves to the
- * server are debounced so typing in a text field doesn't fire a request per
- * keystroke. suggest/chat calls send the in-memory state directly rather
- * than relying on this debounced copy having landed yet.
+ *
+ * No auto-save/debounce: league config edits only persist when `saveConfig`
+ * is called (the Settings page's explicit Save button) — silent auto-save
+ * made it unclear whether an edit had actually landed before switching
+ * tabs. Picks are different: `addPick`/`removeLastPick`/`resetPicks` are
+ * already discrete button-click actions, not continuous typing, so they
+ * persist immediately rather than needing their own save button.
  */
 export function useManualDraft() {
   const [config, setConfig] = useState<ManualLeagueConfig>(emptyConfig);
   const [picks, setPicks] = useState<ManualPick[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   useEffect(() => {
     api.getManualDraftState().then((state) => {
@@ -33,25 +38,40 @@ export function useManualDraft() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!loaded) return; // don't overwrite the real saved state with the initial empty one while it's still loading
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      api.saveManualDraftState({ config, picks }).catch(() => {
-        // best-effort background sync — suggest/chat work from in-memory state either way
-      });
-    }, 500);
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-  }, [config, picks, loaded]);
+  async function persist(next: { config: ManualLeagueConfig; picks: ManualPick[] }) {
+    setSaveStatus("saving");
+    try {
+      await api.saveManualDraftState(next);
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    }
+  }
 
-  const addPick = (pick: Omit<ManualPick, "pickNumber">) => {
-    setPicks((prev) => [...prev, { ...pick, pickNumber: prev.length + 1 }]);
+  const saveConfig = () => persist({ config, picks });
+
+  /** Wraps the raw setter so any further edit un-marks a previous "saved" as stale, rather than leaving a stale "Saved ✓" showing next to unsaved changes. */
+  const updateConfig = (next: ManualLeagueConfig) => {
+    setConfig(next);
+    setSaveStatus("idle");
   };
 
-  const removeLastPick = () => setPicks((prev) => prev.slice(0, -1));
-  const resetPicks = () => setPicks([]);
+  const addPick = (pick: Omit<ManualPick, "pickNumber">) => {
+    const next = [...picks, { ...pick, pickNumber: picks.length + 1 }];
+    setPicks(next);
+    persist({ config, picks: next });
+  };
 
-  return { config, setConfig, picks, addPick, removeLastPick, resetPicks, loaded };
+  const removeLastPick = () => {
+    const next = picks.slice(0, -1);
+    setPicks(next);
+    persist({ config, picks: next });
+  };
+
+  const resetPicks = () => {
+    setPicks([]);
+    persist({ config, picks: [] });
+  };
+
+  return { config, setConfig: updateConfig, saveConfig, picks, addPick, removeLastPick, resetPicks, loaded, saveStatus };
 }

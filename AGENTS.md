@@ -69,8 +69,10 @@ src/server/
                        cap; every outbound call (Yahoo, OpenAI) goes through this
 client/                self-contained Vite + React app, own package.json —
                        hooks/useManualDraft.ts holds Manual Draft's local
-                       state, debounce-synced to the server (see "Manual
-                       Draft persistence" below)
+                       state, explicit-Save-synced to the server (see
+                       "Manual Draft persistence" below); pages/Settings.tsx
+                       (league/teams) and pages/ManualDraft.tsx (draft log)
+                       are separate tabs both using this hook
 ```
 
 Not an npm-workspaces monorepo: Railway's repo scanner auto-splits
@@ -240,19 +242,42 @@ it's expected and harmless (dev is a trusted local machine anyway).
 `features/manualDraftStore.ts` persists to `data/manual-draft.json` using
 the same atomic-write pattern as `auth/tokenStore.ts` (write to a temp file,
 `rename` over the real one — avoids a torn/partial file if the process dies
-mid-write). The client's `hooks/useManualDraft.ts` treats React state as the
-source of truth for rendering and debounces (500ms) writes to the server so
-typing in a text field doesn't fire a request per keystroke.
+mid-write).
+
+`hooks/useManualDraft.ts` deliberately has **no auto-save/debounce** for
+league config: edits only reach the server when the Settings page's Save
+button calls `saveConfig()`. An earlier debounced-autosave version of this
+hook got replaced after review — silent background saving made it unclear
+whether an edit had actually landed, especially once Settings and Manual
+Draft became separate tabs/mounts (see below) where switching tabs quickly
+after typing could plausibly lose an unsaved debounced write. An explicit
+Save button has no such ambiguity. `saveStatus` resets to `"idle"` on every
+`setConfig` call specifically so a stale "Saved ✓" can't sit next to an
+actually-unsaved edit.
+
+Picks are different: `addPick`/`removeLastPick`/`resetPicks` are already
+discrete button-click actions (Log pick / Undo / Reset), not continuous
+typing, so they persist immediately — no separate save button for the
+draft log, and no risk of losing an in-progress edit since there isn't one.
+
+Settings (`pages/Settings.tsx`) and Manual Draft (`pages/ManualDraft.tsx`)
+are separate top-level tabs, each calling `useManualDraft()` independently
+— App.tsx's tab switch fully unmounts the inactive page (conditional JSX
+rendering, not CSS hiding), so each mount does its own fresh `GET` and
+naturally picks up whatever the other tab last saved. There's no shared
+React context for this state; the server round-trip on each mount is the
+sync mechanism.
 
 Deliberately, `POST /api/manual/draft/suggest` and the manual-mode path of
 `POST /api/chat` do **not** read from this store — the client sends its
 current in-memory `config`/`picks` directly in the request body instead.
-This sidesteps a real race: if you click "Get recommendation" a moment
-after typing something, the debounced save might not have landed on disk
-yet, and reading from the store instead of the request body would mean the
-suggestion is grounded in stale data. The store exists purely for
+This matters most for picks (which do save immediately, so the store is
+usually current) but is also what makes an unsaved Settings edit still work
+correctly for a suggestion: a recommendation reflects whatever's currently
+on screen even if you haven't clicked Save yet. The store exists purely for
 durability (surviving a redeploy, working from a second browser) — reads
-for correctness-sensitive requests always come from the caller.
+for correctness-sensitive requests always come from the caller, never the
+store.
 
 ## Config and secrets
 
