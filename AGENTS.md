@@ -348,6 +348,46 @@ never breaks it (typing a name by hand always still works).
 Route: `GET /api/nhl/players`, registered independent of Yahoo/OpenAI
 config — it works whether or not either of those is set up.
 
+**This same list is also what `suggestManualPick` and the manual chat
+context ground their GPT prompts against — this was not the original
+design, and the original design failed badly in real use.** The first
+version of the suggestion prompt just said "use your own knowledge of
+current NHL players... treat anyone listed as drafted as off the board"
+with no real player list at all. In an actual mock draft, it recommended
+players who were already drafted (the model didn't reliably cross-
+reference a growing plain-text exclusion list) and, worse, recommended at
+least one player who is deceased — pure model-memory hallucination with
+nothing grounding it. Fixed by having `suggestManualPick`
+(`features/manualDraft.ts`) and `buildManualContext` (`ManualDraft.tsx`,
+client-side) both call `getAllPlayers()`/fetch the same list, mechanically
+filter out anyone already in `picks` (case-insensitive name match), and
+tell the model it MUST only recommend from that filtered list — turning
+"hope the model remembers correctly" into "the model picks from a list
+that's already been verified and filtered." If the NHL API is unreachable,
+both fall back to the old knowledge-only behavior but with an explicit
+warning in the prompt not to state roster/active status as fact — silently
+falling back with no warning is how the original bug shipped in the first
+place.
+
+The drafted-name filter matches on exact (case-insensitive) name string,
+not player ID — a typo when logging a pick (`Auston Matthws`) won't match
+and that player will still show as "available" to the model. This is a
+known gap, not something to silently paper over: the `PlayerAutocomplete`
+selection flow (fills in the exact NHL-API name) is the real mitigation,
+not the string match itself. Free-typed names remain a weak point.
+
+**This was under-tested before shipping** — the plumbing (does `model`
+flow through, does state persist, does the route respond) was verified,
+but the actual *content* of a GPT recommendation never was, because doing
+so requires a real `OPENAI_API_KEY` and a real mock draft, not just curl
+checks. The drafted-player and dead-player filtering above was verified
+mechanically (a real `getAllPlayers()` call, a fake picks list, confirming
+the removed names are actually gone and everyone remaining is a real
+active player) but *not* verified against a real OpenAI response as of
+this writing — that requires running an actual mock draft against a
+deployed instance with a real key. Don't consider this class of bug closed
+on code review alone; it needs an actual mock draft.
+
 ## Model override plumbing
 
 Every GPT-calling route (`draft/suggest` on both Yahoo and manual paths,

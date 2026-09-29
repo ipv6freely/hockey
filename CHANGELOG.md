@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Fix: GPT draft recommendations were recommending already-drafted
+  players and, at least once, a deceased player.** The original prompt
+  relied entirely on the model's own memory with no real player list to
+  check against. Both `suggestManualPick` and the manual chat context now
+  fetch the same real, current NHL roster list already used for the
+  autocomplete, mechanically remove anyone already drafted, and instruct
+  the model to only recommend from that verified list. Verified
+  mechanically against live NHL data (filtering removes exactly the
+  drafted names, everyone remaining is a real active player) — **not yet
+  re-verified against a real mock draft with a live OpenAI key**, which is
+  what surfaced the original bug; that still needs to happen before
+  considering this fully closed.
 - **Added draft order to Settings, and wired it into an actual "on the
   clock" feature** rather than a purely informational field: reorder teams
   with ↑/↓ (the team list's order *is* the draft order — no separate

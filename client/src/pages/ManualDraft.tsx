@@ -6,9 +6,12 @@ import { ChatBox, ModelPicker, PlayerAutocomplete, useModelPreference, useNhlPla
 import { computeManualDraftClock } from "../../../src/shared/manualDraftClock";
 import type { ManualLeagueConfig, ManualPick, NhlPlayer } from "../../../src/shared/index";
 
-function buildManualContext(config: ManualLeagueConfig, picks: ManualPick[]): string {
+function buildManualContext(config: ManualLeagueConfig, picks: ManualPick[], nhlPlayers: NhlPlayer[]): string {
   const myTeam = config.teams.find((t) => t.isOwnTeam);
   const clock = config.draftType === "snake" ? computeManualDraftClock(config, picks.length) : null;
+  const draftedNames = new Set(picks.map((p) => p.playerName.trim().toLowerCase()));
+  const available = nhlPlayers.filter((p) => !draftedNames.has(p.name.trim().toLowerCase()));
+
   return [
     `League "${config.leagueName || "unnamed"}", ${config.teams.length} teams, draft type: ${config.draftType}.`,
     `Scoring: ${config.scoringNotes || "not specified"}.`,
@@ -21,6 +24,9 @@ function buildManualContext(config: ManualLeagueConfig, picks: ManualPick[]): st
     picks.length > 0
       ? `Picks so far: ${picks.map((p) => `#${p.pickNumber} ${p.teamName} - ${p.playerName} (${p.position})`).join("; ")}.`
       : "No picks recorded yet.",
+    available.length > 0
+      ? `If asked who to draft, only suggest players from this real, current, not-yet-drafted NHL roster list (never suggest a player who isn't on it, even from memory): ${available.map((p) => `${p.name} (${p.position}, ${p.team})`).join(", ")}`
+      : "No verified live player list is available right now — if asked who to draft, say you can't confirm a player's current roster status rather than stating it as fact.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -197,7 +203,11 @@ export function ManualDraftPage() {
 
       <section className="panel">
         <h3>Ask GPT</h3>
-        <ChatBox leagueKey={null} manualContext={buildManualContext(config, picks)} model={model} />
+        <ChatBox
+          leagueKey={null}
+          manualContext={buildManualContext(config, picks, nhlPlayersQuery.data ?? [])}
+          model={model}
+        />
       </section>
     </div>
   );
